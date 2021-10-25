@@ -21,7 +21,7 @@
     "build:tsc": "tsc -b",
     "unit": "tap",
     "test": "npm run lint && npm run unit",
-    "coverage": "tap --coverage",
+    "coverage": "tap --coverage --coverage-report=lcovonly",
     "prepublishOnly": "npm run build"
   },
   "publishConfig": {
@@ -35,20 +35,19 @@
   "author": "KaKa",
   "license": "GPL-3.0",
   "devDependencies": {
-    "@rollup/plugin-typescript": "^8.2.1",
-    "@types/jest": "^26.0.23",
+    "@rollup/plugin-typescript": "^8.3.0",
+    "@types/jest": "^27.0.2",
     "@types/tap": "^15.0.5",
-    "@typescript-eslint/eslint-plugin": "4",
-    "eslint": "7",
-    "eslint-config-standard-with-typescript": "^20.0.0",
-    "eslint-plugin-import": "2",
-    "eslint-plugin-node": "11",
-    "eslint-plugin-promise": "5",
-    "eslint-plugin-standard": "5",
-    "prettier": "^2.3.0",
-    "rollup": "^2.47.0",
+    "@typescript-eslint/eslint-plugin": "^4.0.1",
+    "eslint": "^7.12.1",
+    "eslint-config-standard-with-typescript": "^21.0.1",
+    "eslint-plugin-import": "^2.22.1",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-promise": "^5.0.0",
+    "prettier": "^2.4.1",
+    "rollup": "^2.58.1",
     "tap": "^15.0.10",
     "ts-node": "^10.4.0",
-    "typescript": "^4.2.4"
+    "typescript": "^4.4.4"
   }
 }
