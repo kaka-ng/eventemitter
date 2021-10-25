@@ -15,12 +15,9 @@ export class Listener {
   }
 
   async execute (...args: any[]): Promise<void> {
-    if (this.mode === MODE_ONCE && this.executed) {
-
-    } else {
-      this.executed = true
-      await this.listener.apply(this.listener, args)
-    }
+    if (this.mode === MODE_ONCE && this.executed) return
+    this.executed = true
+    await this.listener.apply(this.listener, args)
   }
 }
 
