@@ -14,8 +14,11 @@ env:
   COVERALLS: 0
 
 jobs:
-  build:
+  test:
     runs-on: ${{ matrix.os }}
+    outputs:
+      COVERALLS: ${{ steps.coveralls-trigger.outputs.COVERALLS_TRIGGER }}
+
     strategy:
       matrix:
         # Maintenance and active LTS
@@ -56,22 +59,27 @@ jobs:
           parallel: true
           flag-name: run-${{ matrix.node-version }}-${{ matrix.os }}
 
-      - name: Typescript
-        id: typescript_test
-        run: npm run typescript --if-present
+      - name: Should Trigger coverallsapp/github-action@master
+        id: coveralls-trigger
+        # https://docs.github.com/en/actions/reference/context-and-expression-syntax-for-github-actions#steps-context
+        # when continue-on-error failed, outcome is failure and conclusion is success
+        if: steps.coveralls-parallel.conclusion == 'success' && steps.coveralls-parallel.outcome != 'success'
+        run: |
+          echo "::set-output name=COVERALLS_TRIGGER::failure"
 
   coverage:
-    needs: build
+    needs: test
     runs-on: ubuntu-latest
+    if: needs.test.outputs.COVERALLS != 'failure'
     steps:
       - name: Coveralls Finished
-        uses: coverallsapp/github-action@v1.1.2
+        uses: coverallsapp/github-action@master
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           parallel-finished: true
 
   automerge:
-    needs: build
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: fastify/github-action-merge-dependabot@v1.2.0
