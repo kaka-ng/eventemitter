@@ -53,6 +53,8 @@ jobs:
         run: npm run coverage
 
       - name: Coveralls Parallel
+        id: coveralls-parallel
+        continue-on-error: true
         uses: coverallsapp/github-action@v1.1.2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
