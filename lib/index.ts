@@ -1,148 +1,194 @@
-const MODE_ONCE = Symbol.for('[[Once Event Listener]]')
-const MODE_ALWAYS = Symbol.for('[[Always Event Listener]]')
-
-export type ListenerMode = typeof MODE_ONCE | typeof MODE_ALWAYS
-
-export class Listener {
-  executed: boolean
-  listener: Function
-  mode: ListenerMode
-
-  constructor (listener: Function, mode: ListenerMode) {
-    this.executed = false
-    this.listener = listener
-    this.mode = mode
-  }
-
-  async execute (...args: any[]): Promise<void> {
-    if (this.mode === MODE_ONCE && this.executed) return
-    this.executed = true
-    await this.listener.apply(this.listener, args)
-  }
-}
-
-const kDefaultMaxListeners = Symbol.for('ee.defaultMaxListeners')
-const kCheckMaxListenter = Symbol.for('ee.checkMaxListenter')
-const kFindEventStack = Symbol.for('ee.findEventStack')
+import EE from 'events'
 
 export type EventName = string | symbol
+export type Listener = ((...args: any[]) => void) | ((...args: any[]) => Promise<void>)
+
+function createDeferedPromise (): { promise: Promise<unknown>, resolve: Function } {
+  const promise: any = {}
+  promise.promise = new Promise(function (resolve) {
+    promise.resolve = resolve
+  })
+  return promise
+}
+
+function wrapOnce (ee: EventEmitter, listener: Listener): Listener {
+  let executed = false
+
+  const execute = async (...args: any[]): Promise<void> => {
+    if (executed) return
+    executed = true
+    await listener.apply(ee, args)
+  }
+  execute.listener = listener
+
+  return execute
+}
 
 export class EventEmitter {
-  private static [kDefaultMaxListeners]: number = 10
+  #events: Map<EventName, Listener[]>
+  #maxListener: number
 
+  constructor () {
+    this.#events = new Map()
+    this.#maxListener = EventEmitter.defaultMaxListeners
+  }
+
+  // we use the node:events one
   static get defaultMaxListeners (): number {
-    return EventEmitter[kDefaultMaxListeners]
+    return EE.defaultMaxListeners
   }
 
   static set defaultMaxListeners (n: number) {
-    if (isNaN(n)) throw new Error('MaxListerners must be a number.')
-    if (!isNaN(n) && n < 0) throw new RangeError('MaxListerners must be a positive number.')
-    EventEmitter[kDefaultMaxListeners] = n
+    EE.defaultMaxListeners = n
   }
 
-  private readonly events: Map<EventName, Listener[]>
-  private maxListeners: number
-
-  constructor () {
-    this.events = new Map()
-    this.maxListeners = EventEmitter.defaultMaxListeners
+  static setMaxListeners (n: number, ...args: Array<EE.EventEmitter | EventEmitter>): void {
+    for (const ee of args) {
+      ee.setMaxListeners(n)
+    }
   }
 
-  addListener (eventName: EventName, listener: Function): this {
+  static async once (ee: EE.EventEmitter | EventEmitter, eventName: EventName): Promise<[Error | null]> {
+    const promise = createDeferedPromise()
+
+    ee.once(eventName, function (...args: any[]) {
+      promise.resolve(args)
+    })
+
+    return promise.promise as any
+  }
+
+  static on (ee: EE.EventEmitter | EventEmitter, eventName: EventName): AsyncIterable<any> {
+    const stack: any[] = []
+    let promise: any = null
+    ee.on(eventName, (...args: any[]) => {
+      stack.push(args)
+      if (promise !== null) promise.resolve()
+    })
+
+    const iterator: AsyncIterator<any> = {
+      async next () {
+        if (stack.length === 0) {
+          // we need to wait for the next event when the stack is cleared
+          promise = createDeferedPromise()
+          await promise.promise
+        }
+        return {
+          done: false,
+          value: stack.shift()
+        }
+      }
+    }
+
+    return {
+      [Symbol.asyncIterator] () {
+        return iterator
+      }
+    }
+  }
+
+  addListener (eventName: EventName, listener: Listener): this {
     return this.on(eventName, listener)
   }
 
   async emit (eventName: EventName, ...args: any[]): Promise<boolean> {
-    const stack = this[kFindEventStack](eventName)
-    for (let i = 0; i < stack.length; i++) {
-      const listener = stack[i]
-      await listener.execute(...args)
+    const stack = this.#findEventStack(eventName)
+    for (const listener of stack) {
+      await listener.apply(this, args)
     }
     return true
   }
 
   eventNames (): EventName[] {
-    return Array.from(this.events.keys())
+    return Array.from(this.#events.keys())
   }
 
   getMaxListeners (): number {
-    return this.maxListeners
+    return this.#maxListener
   }
 
   listenerCount (eventName: EventName): number {
-    return this[kFindEventStack](eventName).length
+    return this.#findEventStack(eventName).length
   }
 
-  listeners (eventName: EventName): Listener[] {
-    return this[kFindEventStack](eventName)
+  listeners (eventName: EventName): Function[] {
+    const stack = this.#findEventStack(eventName)
+    return stack.filter((l: any) => typeof l.listener === 'undefined')
   }
 
-  off (eventName: EventName, listener: Function): this {
-    return this.removeListener(eventName, listener)
-  }
-
-  on (eventName: EventName, listener: Function): this {
-    this[kFindEventStack](eventName).push(new Listener(listener, MODE_ALWAYS))
-    this[kCheckMaxListenter](eventName)
-    return this
-  }
-
-  once (eventName: EventName, listener: Function): this {
-    this[kFindEventStack](eventName).push(new Listener(listener, MODE_ONCE))
-    this[kCheckMaxListenter](eventName)
-    return this
-  }
-
-  prependListener (eventName: string | symbol, listener: Function): this {
-    this[kFindEventStack](eventName).unshift(new Listener(listener, MODE_ALWAYS))
-    this[kCheckMaxListenter](eventName)
-    return this
-  }
-
-  prependOnceListener (eventName: string | symbol, listener: Function): this {
-    this[kFindEventStack](eventName).unshift(new Listener(listener, MODE_ONCE))
-    this[kCheckMaxListenter](eventName)
-    return this
-  }
-
-  removeAllListeners (eventName: string | symbol): this {
-    this.events.delete(eventName)
-    return this
-  }
-
-  removeListener (eventName: EventName, listener: Function): this {
-    const stack = this[kFindEventStack](eventName)
-    const index = stack.findIndex(function (l) {
-      return l.listener === listener
+  off (eventName: EventName, listener: Listener): this {
+    const stack = this.#findEventStack(eventName)
+    const index = stack.findIndex(function (l: any) {
+      // once
+      if (typeof l.listener === 'function') return l.listener === listener
+      // on
+      return l === listener
     })
-    if (index !== -1) { stack.splice(index, 1) }
+    if (index !== -1) stack.splice(index, 1)
     return this
   }
 
-  setMaxListeners (n: number): void {
+  on (eventName: EventName, listener: Listener): this {
+    this.#findEventStack(eventName).push(listener)
+    this.#checkMaxListener(eventName)
+    return this
+  }
+
+  once (eventName: EventName, listener: Listener): this {
+    this.#findEventStack(eventName).push(wrapOnce(this, listener))
+    this.#checkMaxListener(eventName)
+    return this
+  }
+
+  prependListener (eventName: EventName, listener: Listener): this {
+    this.#findEventStack(eventName).unshift(listener)
+    this.#checkMaxListener(eventName)
+    return this
+  }
+
+  prependOnceListener (eventName: EventName, listener: Listener): this {
+    this.#findEventStack(eventName).unshift(wrapOnce(this, listener))
+    this.#checkMaxListener(eventName)
+    return this
+  }
+
+  removeAllListeners (eventName?: EventName): this {
+    if (typeof eventName === 'string' || typeof eventName === 'symbol') {
+      this.#events.delete(eventName)
+    } else {
+      this.#events.clear()
+    }
+    return this
+  }
+
+  removeListener (eventName: EventName, listener: Listener): this {
+    return this.off(eventName, listener)
+  }
+
+  setMaxListeners (n: number): this {
     if (isNaN(n)) throw new Error('MaxListerners must be a number.')
     if (!isNaN(n) && n < 0) throw new RangeError('MaxListerners must be a positive number.')
-    this.maxListeners = n
+    this.#maxListener = n
+    return this
   }
 
   rawListeners (eventName: EventName): Function[] {
-    return this[kFindEventStack](eventName).map(function (l) {
-      return l.listener
-    })
+    return this.#findEventStack(eventName)
   }
 
-  private [kCheckMaxListenter] (eventName: EventName): void {
-    if (this.listenerCount(eventName) > this.maxListeners) {
+  #findEventStack (eventName: EventName): Listener[] {
+    let events = this.#events.get(eventName)
+    if (!Array.isArray(events)) {
+      events = []
+      this.#events.set(eventName, events)
+    }
+    return events
+  }
+
+  #checkMaxListener (eventName: EventName): void {
+    if (this.listenerCount(eventName) > this.#maxListener) {
       process.emitWarning('', 'MaxListenersExceededWarning')
     }
   }
-
-  private [kFindEventStack] (eventName: EventName): Listener[] {
-    if (!this.events.has(eventName)) {
-      this.events.set(eventName, [])
-    }
-    return this.events.get(eventName) as Listener[]
-  }
 }
-
 export default EventEmitter

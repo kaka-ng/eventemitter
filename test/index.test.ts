@@ -1,6 +1,6 @@
 import * as crypto from 'crypto'
 import t from 'tap'
-import { EventEmitter, Listener } from '../lib'
+import { EventEmitter } from '../lib'
 
 async function tick (): Promise<void> {
   return await new Promise(function (resolve) {
@@ -225,7 +225,7 @@ t.test('EventEmitter', function (t) {
       }
       t.equal(ee.listeners(eventName).length, random)
       ee.listeners(eventName).forEach(function (l) {
-        t.equal(l instanceof Listener, true)
+        t.equal(typeof l === 'function', true)
       })
     })
   })
@@ -308,7 +308,7 @@ t.test('EventEmitter', function (t) {
       t.plan(1)
       const ee = new EventEmitter()
       ee.once(eventName, tick)
-      t.equal(ee.rawListeners(eventName).includes(tick), true)
+      t.equal(ee.rawListeners(eventName).findIndex((l: any) => l.listener === tick) !== -1, true)
     })
 
     t.test('emit Warning', function (t) {
@@ -407,16 +407,25 @@ t.test('EventEmitter', function (t) {
   })
 
   t.test('removeAllListeners', function (t) {
-    t.plan(1)
+    t.plan(2)
     const eventName = crypto.randomBytes(4).toString('hex')
     const ee = new EventEmitter()
-    ee.on(eventName, tick)
-    ee.on(eventName, tick)
 
-    t.test('empty', function (t) {
+    t.test('by eventName', function (t) {
       t.plan(1)
+      ee.on(eventName, tick)
+      ee.on(eventName, tick)
       ee.removeAllListeners(eventName)
       t.equal(ee.listenerCount(eventName), 0)
+    })
+
+    t.test('clearAll', function (t) {
+      t.plan(2)
+      ee.on('foo', tick)
+      ee.on('bar', tick)
+      ee.removeAllListeners()
+      t.equal(ee.listenerCount('foo'), 0)
+      t.equal(ee.listenerCount('bar'), 0)
     })
   })
 
