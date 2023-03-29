@@ -4,7 +4,7 @@ import t from 'tap'
 import { EventEmitter } from '../lib'
 
 t.test('node:events', function (t) {
-  t.plan(3)
+  t.plan(4)
 
   t.test('once', async function (t) {
     t.plan(1)
@@ -31,6 +31,22 @@ t.test('node:events', function (t) {
     }
   })
 
+  t.test('iterator', async function (t) {
+    t.plan(4)
+    const ee = new EventEmitter()
+    process.nextTick(() => {
+      ee.emit('on', 'foo')
+      ee.emit('on', 'foo')
+    })
+    const iterator = EventEmitter.on(ee as any, 'on')[Symbol.asyncIterator]()
+    const e1 = await Promise.all([iterator.next(), iterator.next(), iterator.next()])
+    for (const { value } of e1) {
+      t.same(value, ['foo'])
+    }
+    const e2 = await iterator.next()
+    t.same(e2.value, ['foo'])
+  })
+
   t.test('setMaxListeners', function (t) {
     t.plan(2)
 
@@ -44,7 +60,7 @@ t.test('node:events', function (t) {
 })
 
 t.test('EventEmitter', async function (t) {
-  t.plan(3)
+  t.plan(4)
 
   t.test('once', async function (t) {
     t.plan(1)
@@ -69,6 +85,22 @@ t.test('EventEmitter', async function (t) {
       count++
       if (count === 2) break
     }
+  })
+
+  t.test('iterator', async function (t) {
+    t.plan(4)
+    const ee = new EventEmitter()
+    process.nextTick(() => {
+      ee.emit('on', 'foo')
+      ee.emit('on', 'foo')
+    })
+    const iterator = EventEmitter.on(ee as any, 'on')[Symbol.asyncIterator]()
+    const e1 = await Promise.all([iterator.next(), iterator.next(), iterator.next()])
+    for (const { value } of e1) {
+      t.same(value, ['foo'])
+    }
+    const e2 = await iterator.next()
+    t.same(e2.value, ['foo'])
   })
 
   t.test('setMaxListeners', function (t) {

@@ -65,19 +65,29 @@ export class EventEmitter {
       stack.push(args)
       // we cannot check this line as it is actually stale
       /* istanbul ignore else */
-      if (promise !== null) promise.resolve()
+      if (promise !== null) {
+        // when we are waiting for new event
+        // the next call may stack up
+        // we resolve as the same time with same value
+        promise.resolve({
+          done: false,
+          value: stack.shift()
+        })
+        promise = null
+      }
     })
 
     const iterator: AsyncIterator<any> = {
       async next () {
         if (stack.length === 0) {
           // we need to wait for the next event when the stack is cleared
-          promise = createDeferedPromise()
-          await promise.promise
-        }
-        return {
-          done: false,
-          value: stack.shift()
+          if (promise === null) promise = createDeferedPromise()
+          return promise.promise
+        } else {
+          return {
+            done: false,
+            value: stack.shift()
+          }
         }
       }
     }
