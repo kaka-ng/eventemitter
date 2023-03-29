@@ -63,6 +63,8 @@ export class EventEmitter {
     let promise: any = null
     ee.on(eventName, (...args: any[]) => {
       stack.push(args)
+      // we cannot check this line as it is actually stale
+      /* istanbul ignore else */
       if (promise !== null) promise.resolve()
     })
 
