@@ -3,9 +3,9 @@ import t from 'tap'
 import { EventEmitter } from '../lib'
 
 async function tick (): Promise<void> {
-  return await new Promise(function (resolve) {
+  await new Promise(function (resolve) {
     process.nextTick(function () {
-      resolve()
+      resolve('')
     })
   })
 }
@@ -118,18 +118,18 @@ t.test('EventEmitter', function (t) {
     const ee = new EventEmitter()
     const order: string[] = []
     async function before (order: string[]): Promise<void> {
-      return await new Promise(function (resolve) {
+      await new Promise(function (resolve) {
         process.nextTick(function () {
           order.push('before')
-          resolve()
+          resolve('')
         })
       })
     };
     async function after (order: string[]): Promise<void> {
-      return await new Promise(function (resolve) {
+      await new Promise(function (resolve) {
         process.nextTick(function () {
           order.push('after')
-          resolve()
+          resolve('')
         })
       })
     };
@@ -329,18 +329,18 @@ t.test('EventEmitter', function (t) {
     const ee = new EventEmitter()
     const order: string[] = []
     async function before (order: string[]): Promise<void> {
-      return await new Promise(function (resolve) {
+      await new Promise(function (resolve) {
         process.nextTick(function () {
           order.push('before')
-          resolve()
+          resolve('')
         })
       })
     };
     async function after (order: string[]): Promise<void> {
-      return await new Promise(function (resolve) {
+      await new Promise(function (resolve) {
         process.nextTick(function () {
           order.push('after')
-          resolve()
+          resolve('')
         })
       })
     };
@@ -371,18 +371,18 @@ t.test('EventEmitter', function (t) {
     const ee = new EventEmitter()
     const order: string[] = []
     async function before (order: string[]): Promise<void> {
-      return await new Promise(function (resolve) {
+      await new Promise(function (resolve) {
         process.nextTick(function () {
           order.push('before')
-          resolve()
+          resolve('')
         })
       })
     };
     async function after (order: string[]): Promise<void> {
-      return await new Promise(function (resolve) {
+      await new Promise(function (resolve) {
         process.nextTick(function () {
           order.push('after')
-          resolve()
+          resolve('')
         })
       })
     };
